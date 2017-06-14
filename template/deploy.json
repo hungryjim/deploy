@@ -1,0 +1,7 @@
+{
+  "staticPath" : "/static",
+
+  "modules": ["copy_files", "compress_js", "replace_pictures", "compress_css","change_config", "move_static"],
+
+  "versionFiles": "/../views/param_config.ftl"
+}

@@ -1,0 +1,65 @@
+#!/usr/bin/env node
+
+'use strict';
+
+
+var utils = require('../utils'),
+    fs = require('fs'),
+    async = require('async'),
+    storage = require('../storage');
+
+// 部署文件的独立文件
+var DEPLOY_FILE = 'deploy.json';
+
+var program = require('commander');
+program.option('-r, --rev <n>').option('-n, --nocompress <n>').parse(process.argv);
+
+var gitRev = program.rev, 
+    noCompress = program.nocompress;
+
+var realRev = Number(gitRev || utils.generateVersion());
+if (isNaN(realRev)) {
+  utils.log('版本错误，部署失败 ！');
+  process.exit(-1);
+}
+realRev = realRev.toString(16);
+storage.set('version', realRev);
+var basePath;
+storage.set('basePath', (basePath = __dirname + '/../'));
+
+
+// 读取系统的配置文件
+var config;
+try {
+  config = JSON.parse(fs.readFileSync(basePath + 'template/' + DEPLOY_FILE).toString());
+} catch (e) {
+  utils.log(e.message);
+  config = JSON.parse(fs.readFileSync('template/' + DEPLOY_FILE).toString());
+}
+
+
+// 如果已经部署过静态文件，则不需要重新部署，修改模板文件中的版本号即可
+if (noCompress == 'Y') {
+  config.modules = ['change_config'];
+}
+
+
+var routes = {};
+config.modules.forEach(function(modular) {
+  var procedure = './procedures/' + modular;
+  
+  if (modular.trim(modular).length != 0 && fs.existsSync(basePath + procedure + '.js')) {
+    routes[modular] = require('../' + procedure).run;
+  }
+});
+// console.log(modules);
+var resultsHandler = function(err, results) {
+  if (err) {
+    utils.log('部署失败，因为' + err.message + '！');
+  } else {
+    utils.log('部署成功！');
+  }
+};
+
+storage.set('config', config);
+async.series(routes, resultsHandler);
